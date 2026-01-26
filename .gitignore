@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.BS_Store
+.DS_Store
+
+# User Data Directories
+DI/
+TW/
+4 Towns Calibration/
+regression data(0,5,10,15,25)/
+ML files/
+lead level classification/
