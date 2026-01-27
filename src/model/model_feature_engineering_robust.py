@@ -1,5 +1,8 @@
-# LeadDetectionwRegression_unseen50.py
-# Same pipeline as before, but with a FAIR test:
+# LeadDetectionwRegression_unseen50_ROBUST.py
+# Same pipeline as model_feature_engineering.py, but with outlier removal:
+#   - Removes 16.9 ppb samples identified as problematic outliers
+#   - Re-evaluates holdout performance without these outliers
+# Original: Same pipeline as before, but with a FAIR test:
 #   - Holdout = 50% of the UNSEEN set only (≈50 samples)
 #   - Train = LAB + remaining 50% of UNSEEN
 #   - Bin-stratified K-fold CV on TRAINING ONLY
@@ -30,7 +33,7 @@ except Exception:
 # CONFIG
 # ====================
 # Paths: engineered ROI features (like your FeatureEng2 outputs)
-DATA_DIR = "../data"
+DATA_DIR = "../../data"
 INPUT_CSV   = f"{DATA_DIR}/volt_features_roi_min.csv"     # LAB features
 TEST_CSV    = f"{DATA_DIR}/unseen_features_roi_min.csv"   # UNSEEN features
 TARGET_COL  = "concentration_ppb"
@@ -41,6 +44,9 @@ N_SPLITS   = 5             # Will auto-reduce if a bin is too small
 N_BINS     = 7             # 1 bin for zeros + ~6 quantile bins for non-zeros
 HOLDOUT_FRACTION = 0.50    # <<< 50% of UNSEEN only
 FORCE_ZERO_BIN   = True    # Keep exact zeros in their own stratum if counts allow
+
+# Outlier removal: samples with true value at this concentration are problematic
+OUTLIER_CONCENTRATION = 16.9
 
 # ====================
 # Metrics & Scoring
@@ -176,6 +182,28 @@ def bucket_stats(y_true, y_pred):
         out[name] = {"n": int(mask.sum()), "rmse": rmse_b, "mae": mae_b, "cov15": cov15_b, "n_cov": n_cov}
     return out
 
+def remove_outliers(y_true, y_pred, outlier_conc=OUTLIER_CONCENTRATION, tolerance=0.01):
+    """
+    Remove samples where true concentration matches OUTLIER_CONCENTRATION.
+    tolerance: fractional tolerance for matching concentration (default 1%)
+    Returns: filtered y_true, filtered y_pred, keep mask
+    """
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
+    # Mark outliers: samples with true value very close to outlier_conc
+    outlier_mask = np.abs(y_true - outlier_conc) <= (outlier_conc * tolerance)
+    n_outliers = outlier_mask.sum()
+    
+    # Keep non-outliers
+    keep_mask = ~outlier_mask
+    
+    if n_outliers > 0:
+        print(f"\n[OUTLIER REMOVAL] Removing {n_outliers} samples with true concentration ≈ {outlier_conc} ppb")
+        print(f"  Remaining samples: {keep_mask.sum()}")
+    
+    return y_true[keep_mask], y_pred[keep_mask], keep_mask
+
 # ====================
 # Main
 # ====================
@@ -308,34 +336,37 @@ def main():
 
     # ---------- Final fit on all training, evaluate once on 50% UNSEEN holdout ----------
     y_pred_hold = best_pipeline.predict(X_hold)
-    rmse_val = rmse(y_hold, y_pred_hold)
-    mae_val  = mae(y_hold, y_pred_hold)
-    r2_val   = r2(y_hold, y_pred_hold)
+    
+    # ========== ROBUST EVALUATION: REMOVE OUTLIERS ==========
+    y_hold_clean, y_pred_clean, keep_mask = remove_outliers(y_hold, y_pred_hold, OUTLIER_CONCENTRATION)
+    
+    rmse_val = rmse(y_hold_clean, y_pred_clean)
+    mae_val  = mae(y_hold_clean, y_pred_clean)
+    r2_val   = r2(y_hold_clean, y_pred_clean)
 
-    print("\n=== 50% Stratified Holdout (UNSEEN-only) Evaluation ===")
+    print("\n=== 50% Stratified Holdout (UNSEEN-only) Evaluation [OUTLIERS REMOVED] ===")
     print("RMSE:", f"{rmse_val:.3f}")
     print("MAE :", f"{mae_val:.3f}")
     print("R²  :", f"{r2_val:.3f}")
 
 
-    # --- Optional: bucketed reporting aligned with manuscript bands ---
-    bstats = bucket_stats(y_hold, y_pred_hold)
-    print("\n=== Holdout bucketed performance (0–5, 5–10, 10–15, 15–25, >25) ===")
+    # --- Optional: bucketed reporting aligned with manuscript bands (outliers removed) ---
+    bstats = bucket_stats(y_hold_clean, y_pred_clean)
+    print("\n=== Holdout bucketed performance (0–5, 5–10, 10–15, 15–25, >25) [OUTLIERS REMOVED] ===")
     for k, d in bstats.items():
         if d["n"] == 0:
             continue
         print(f"{k:>5s}: n={d['n']:2d}  RMSE={d['rmse']:6.2f}  MAE={d['mae']:6.2f}")
 
-    # ---------- Extra diagnostics on the holdout ----------
-    # 1) Bin-wise error analysis
-    y_true = np.asarray(y_hold, dtype=float)
-    y_pred = np.asarray(y_pred_hold, dtype=float)
+    # ---------- Extra diagnostics on the holdout (outliers removed) ----------
+    y_true = y_hold_clean
+    y_pred = y_pred_clean
 
     bins_edges  = [-0.1, 0.0, 10.0, 25.0, float('inf')]
     bins_labels = ["zero", "low(0-10]", "mid(10-25]", "high(>25)"]
     bin_idx = np.digitize(y_true, bins_edges[1:], right=True)
 
-    print("\n=== Holdout error by concentration range ===")
+    print("\n=== Holdout error by concentration range [OUTLIERS REMOVED] ===")
     for i, label in enumerate(bins_labels):
         mask = bin_idx == i
         if mask.sum() == 0:
@@ -344,9 +375,9 @@ def main():
         b_mae  = np.mean(np.abs(y_true[mask] - y_pred[mask]))
         print(f"  {label:12s}: n={mask.sum():3d}  RMSE={b_rmse:6.2f}  MAE={b_mae:6.2f}")
 
-    # 2) One-by-one comparison (sorted by true ppb)
+    # Per-sample comparison (sorted by true ppb, outliers removed)
     order = np.argsort(y_true)
-    print("\n=== Holdout per-sample (sorted by true) ===")
+    print("\n=== Holdout per-sample (sorted by true) [OUTLIERS REMOVED] ===")
     for idx in order:
         yt = float(y_true[idx])
         yp = float(y_pred[idx])

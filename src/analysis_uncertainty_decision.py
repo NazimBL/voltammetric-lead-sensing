@@ -448,7 +448,7 @@ def plot_roc_curves(results_dict):
     """Plot ROC curves for both models."""
     fig, ax = plt.subplots(figsize=(8, 6))
     
-    colors = {"PCR": "blue", "LeadDetection": "red"}
+    colors = {"PCA-PLS model": "blue", "LASSO model": "red"}
     
     for model_name, (_, y_pred, _, metrics_dict) in results_dict.items():
         if "decision_metrics" not in metrics_dict:
@@ -651,14 +651,14 @@ def main():
     print(f"\n{'Model':<25} | {'RMSE':<8} | {'MAE':<8} | {'R²':<8} | {'Sensitivity':<12} | {'Specificity':<12} | {'AUC':<8}")
     print("-" * 105)
     
-    for name, metrics in [("PCR (PLS)", metrics_pcr), ("LeadDetection", metrics_lead)]:
+    for name, metrics in [("PCA-PLS model", metrics_pcr), ("LASSO model", metrics_lead)]:
         dm = metrics["decision_metrics"]
         print(f"{name:<25} | {metrics['rmse']:<8.3f} | {metrics['mae']:<8.3f} | {metrics['r2']:<8.3f} | {dm['sensitivity']:<12.3f} | {dm['specificity']:<12.3f} | {dm['roc_auc']:<8.3f}")
     
     # Store results for visualization
     results_dict = {
-        "PCR": (y_pcr, y_pred_pcr, pipe_pcr, metrics_pcr),
-        "LeadDetection": (y_lead, y_pred_lead, pipe_lead, metrics_lead)
+        "PCA-PLS model": (y_pcr, y_pred_pcr, pipe_pcr, metrics_pcr),
+        "LASSO model": (y_lead, y_pred_lead, pipe_lead, metrics_lead)
     }
     
     # Generate visualizations
