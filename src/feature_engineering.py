@@ -21,8 +21,9 @@ import pandas as pd
 # =========================
 # CONFIG — edit as needed
 # =========================
-INPUT_CSV  = "unseen_baseline.csv"  # or unseen_baseline.csv
-OUTPUT_CSV = "unseen_features_roi.csv"                  # matches regression.py default
+DATA_DIR = "../data"
+INPUT_CSV  = f"{DATA_DIR}/unseen_baseline.csv"  # or unseen_baseline.csv
+OUTPUT_CSV = f"{DATA_DIR}/unseen_features_roi.csv"                  # matches regression.py default
 
 ROI_LOW_V  = -0.3078   # volts (engineer-specified Pb peak window)
 ROI_HIGH_V = -0.0629   # volts
@@ -32,7 +33,6 @@ EPS = 1e-12
 # Optional smoothing for stability of derivatives/slopes
 SMOOTH_BOXCAR = True
 SMOOTH_WINDOW = 5  # odd integer >= 3; small to avoid peak distortion
-
 # Which features get validity flags + NaN->0 imputation
 PEAK_SHAPE_FEATURES = ["FWHM", "Slope_fall", "Symmetry", "Peak_to_bg"]
 

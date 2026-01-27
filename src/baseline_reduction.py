@@ -4,10 +4,11 @@ import numpy as np
 # =====================
 # CONFIG
 # =====================
-INPUT_CSV = "merged_voltammetry_wide.csv"        # your wide-format file
+DATA_DIR = "../data"
+INPUT_CSV = f"{DATA_DIR}/merged_voltammetry_wide.csv"        # your wide-format file
 
-#INPUT_CSV = "unseen_samples.csv"
-OUTPUT_CSV = "merged_voltammetry_baseline.csv"
+#INPUT_CSV = f"{DATA_DIR}/unseen_samples.csv"
+OUTPUT_CSV = f"{DATA_DIR}/merged_voltammetry_baseline.csv"
 BASELINE_VOLTAGE = -0.4507                       # engineer’s reference
 
 # =====================

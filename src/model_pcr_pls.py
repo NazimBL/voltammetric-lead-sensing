@@ -20,7 +20,8 @@ from scipy.stats import pearsonr
 # ====================
 # CONFIG
 # ====================
-INPUT_CSV = "raw_matrix_all.csv"
+DATA_DIR = "../data"
+INPUT_CSV = f"{DATA_DIR}/raw_matrix_all.csv"
 TARGET_COL = "concentration_ppb"
 DATASET_COL = "dataset"
 RANDOM_STATE = 42

@@ -6,10 +6,11 @@ from typing import Tuple, List
 # ====================
 # CONFIG
 # ====================
-LAB_BASELINE_CSV = "lab_baseline.csv"
-UNSEEN_BASELINE_CSV = "unseen_baseline.csv"
+DATA_DIR = "../data"
+LAB_BASELINE_CSV = f"{DATA_DIR}/lab_baseline.csv"
+UNSEEN_BASELINE_CSV = f"{DATA_DIR}/unseen_baseline.csv"
 TARGET_COL = "concentration_ppb"
-OUT_CSV = "raw_matrix_all.csv"
+OUT_CSV = f"{DATA_DIR}/raw_matrix_all.csv"
 ROUND_DECIMALS = 4   # round numeric part of potential names to this many decimals
 
 def _normalize_potential_columns(df: pd.DataFrame, target_col: str, round_decimals: int) -> pd.DataFrame:

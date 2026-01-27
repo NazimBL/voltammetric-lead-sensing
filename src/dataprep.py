@@ -8,7 +8,8 @@ import numpy as np
 # CONFIG — edit these
 # =========================
 INPUT_FOLDER = "TW"   # ← set to the folder containing the 5 files
-OUTPUT_CSV   = "merged_voltammetry_wide.csv"
+DATA_DIR = "../data"
+OUTPUT_CSV   = f"{DATA_DIR}/merged_voltammetry_wide.csv"
 
 # If True, enforce that all files share the exact same potential grid (recommended).
 # If grids differ, the script will raise with a clear message.

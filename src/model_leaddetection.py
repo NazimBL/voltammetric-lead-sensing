@@ -30,8 +30,9 @@ except Exception:
 # CONFIG
 # ====================
 # Paths: engineered ROI features (like your FeatureEng2 outputs)
-INPUT_CSV   = "volt_features_roi_min.csv"     # LAB features
-TEST_CSV    = "unseen_features_roi_min.csv"   # UNSEEN features
+DATA_DIR = "../data"
+INPUT_CSV   = f"{DATA_DIR}/volt_features_roi_min.csv"     # LAB features
+TEST_CSV    = f"{DATA_DIR}/unseen_features_roi_min.csv"   # UNSEEN features
 TARGET_COL  = "concentration_ppb"
 RANDOM_STATE = 42
 

@@ -11,7 +11,9 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 # ====================
 # CONFIG
 # ====================
-INPUT_CSV = "raw_matrix_all.csv"
+DATA_DIR = "../data"
+PLOTS_DIR = "../plots"
+INPUT_CSV = f"{DATA_DIR}/raw_matrix_all.csv"
 TARGET_COL = "concentration_ppb"
 DATASET_COL = "dataset"
 N_COMPONENTS = 5  # enough to cover variance, we’ll only plot first 2
@@ -42,7 +44,7 @@ def main():
     plt.title("PCA Explained Variance")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("pca_explained_variance.png", dpi=150)
+    plt.savefig(f"{PLOTS_DIR}/pca_explained_variance.png", dpi=150)
 
     # 2. Scores scatter (PC1 vs PC2, colored by concentration, shape by dataset)
     # 2. Scores scatter: color = concentration (continuous), marker = dataset
@@ -74,7 +76,7 @@ def main():
     plt.legend(title="Dataset")
     plt.grid(True, linestyle="--", alpha=0.3, zorder=1)
     plt.tight_layout()
-    plt.savefig("pca_scores_scatter.png", dpi=150)
+    plt.savefig(f"{PLOTS_DIR}/pca_scores_scatter.png", dpi=150)
 
     # --- PC1 vs concentration with R²
     pc1 = X_scores[:, 0]
@@ -89,7 +91,7 @@ def main():
     plt.title(f"PC1 vs Concentration (r = {r:.3f}, R² = {r2_val:.3f})")
     plt.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
-    plt.savefig("pca_pc1_vs_concentration.png", dpi=150)
+    plt.savefig(f"{PLOTS_DIR}/pca_pc1_vs_concentration.png", dpi=150)
 
     # --- 3D scatter: PC1, PC2, PC3
     fig = plt.figure(figsize=(7, 6))
@@ -103,7 +105,7 @@ def main():
     cbar = plt.colorbar(sc)
     cbar.set_label("Concentration (ppb)")
     plt.tight_layout()
-    plt.savefig("pca_3d_scatter.png", dpi=150)
+    plt.savefig(f"{PLOTS_DIR}/pca_3d_scatter.png", dpi=150)
 
     # 3. Loadings for PC1 and PC2
     plt.figure(figsize=(7,4))
@@ -115,7 +117,7 @@ def main():
     plt.legend()
     plt.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
-    plt.savefig("pca_loadings.png", dpi=150)
+    plt.savefig(f"{PLOTS_DIR}/pca_loadings.png", dpi=150)
 
     print("Saved plots: pca_explained_variance.png, pca_scores_scatter.png, pca_loadings.png")
 
