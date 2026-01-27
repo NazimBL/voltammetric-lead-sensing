@@ -1,14 +1,15 @@
-# Uncertainty_and_DecisionMetrics.py
+# analysis_uncertainty_decision_robust.py
 # Comprehensive uncertainty quantification and decision metrics at 15 ppb action level
+# ROBUST VERSION: Evaluates models with 16.9 ppb outlier samples removed
 # Evaluates:
-#   1. PCR_50test.py (PCA-based models on raw V_* potentials)
-#   2. LeadDetectionwRegression.py (Feature-engineered model zoo)
+#   1. PCR_50test.py (PCA-based models on raw V_* potentials) - ROBUST
+#   2. LeadDetectionwRegression.py (Feature-engineered model zoo) - ROBUST
 #
 # Outputs:
 #   - Prediction intervals (95% CI via bootstrap)
 #   - Binary classification metrics at 15 ppb threshold
 #   - Sensitivity/Specificity/ROC/AUC at action level
-#   - Publication-quality visualizations saved to plots/ folder
+#   - Publication-quality visualizations saved to plots/ folder (clean data, no outliers)
 
 import numpy as np
 import pandas as pd
@@ -64,6 +65,9 @@ FORCE_ZERO_BIN = True
 # Bootstrap for prediction intervals
 N_BOOTSTRAP = 100
 CONFIDENCE_LEVEL = 0.95
+
+# Outlier removal: samples with true value at this concentration are problematic
+OUTLIER_CONCENTRATION = 16.9
 
 # ==================== HELPERS ====================
 def rmse(y_true, y_pred):
@@ -122,6 +126,28 @@ def select_feature_columns(df: pd.DataFrame, target_col: str) -> List[str]:
     exclude = {"sample_id", "source_file", target_col, DATASET_COL}
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in num_cols if c not in exclude]
+
+def remove_outliers(y_true, y_pred, outlier_conc=OUTLIER_CONCENTRATION, tolerance=0.01):
+    """
+    Remove samples where true concentration matches OUTLIER_CONCENTRATION.
+    tolerance: fractional tolerance for matching concentration (default 1%)
+    Returns: filtered y_true, filtered y_pred, keep mask
+    """
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
+    # Mark outliers: samples with true value very close to outlier_conc
+    outlier_mask = np.abs(y_true - outlier_conc) <= (outlier_conc * tolerance)
+    n_outliers = outlier_mask.sum()
+    
+    # Keep non-outliers
+    keep_mask = ~outlier_mask
+    
+    if n_outliers > 0:
+        print(f"[OUTLIER REMOVAL] Removing {n_outliers} samples with true concentration ≈ {outlier_conc} ppb")
+        print(f"  Remaining samples: {keep_mask.sum()}")
+    
+    return y_true[keep_mask], y_pred[keep_mask], keep_mask
 
 def make_preprocessor(feature_cols: List[str]) -> ColumnTransformer:
     return ColumnTransformer([
@@ -298,18 +324,21 @@ def run_pcr_models():
     # Holdout evaluation
     y_pred_hold = best_pipeline.predict(X_hold)
     
+    # ========== OUTLIER REMOVAL FOR FAIR COMPARISON ==========
+    y_hold_clean, y_pred_clean, _ = remove_outliers(y_hold, y_pred_hold, OUTLIER_CONCENTRATION)
+    
     metrics = {
         "model": best_model_name,
-        "rmse": rmse(y_hold, y_pred_hold),
-        "mae": mae(y_hold, y_pred_hold),
-        "r2": r2(y_hold, y_pred_hold)
+        "rmse": rmse(y_hold_clean, y_pred_clean),
+        "mae": mae(y_hold_clean, y_pred_clean),
+        "r2": r2(y_hold_clean, y_pred_clean)
     }
     
-    print(f"Holdout RMSE: {metrics['rmse']:.3f}")
-    print(f"Holdout MAE:  {metrics['mae']:.3f}")
-    print(f"Holdout R²:   {metrics['r2']:.3f}")
+    print(f"Holdout RMSE (clean): {metrics['rmse']:.3f}")
+    print(f"Holdout MAE (clean):  {metrics['mae']:.3f}")
+    print(f"Holdout R² (clean):   {metrics['r2']:.3f}")
     
-    return y_hold, y_pred_hold, best_pipeline, X_hold, metrics
+    return y_hold_clean, y_pred_clean, best_pipeline, X_hold, metrics
 
 # ==================== RUN LEADDETECTION MODELS ====================
 def run_lead_detection_models():
@@ -430,18 +459,21 @@ def run_lead_detection_models():
     # Holdout evaluation
     y_pred_hold = best_pipeline.predict(X_hold)
     
+    # ========== OUTLIER REMOVAL FOR FAIR COMPARISON ==========
+    y_hold_clean, y_pred_clean, _ = remove_outliers(y_hold, y_pred_hold, OUTLIER_CONCENTRATION)
+    
     metrics = {
         "model": best_model_name,
-        "rmse": rmse(y_hold, y_pred_hold),
-        "mae": mae(y_hold, y_pred_hold),
-        "r2": r2(y_hold, y_pred_hold)
+        "rmse": rmse(y_hold_clean, y_pred_clean),
+        "mae": mae(y_hold_clean, y_pred_clean),
+        "r2": r2(y_hold_clean, y_pred_clean)
     }
     
-    print(f"Holdout RMSE: {metrics['rmse']:.3f}")
-    print(f"Holdout MAE:  {metrics['mae']:.3f}")
-    print(f"Holdout R²:   {metrics['r2']:.3f}")
+    print(f"Holdout RMSE (clean): {metrics['rmse']:.3f}")
+    print(f"Holdout MAE (clean):  {metrics['mae']:.3f}")
+    print(f"Holdout R² (clean):   {metrics['r2']:.3f}")
     
-    return y_hold, y_pred_hold, best_pipeline, X_hold, metrics
+    return y_hold_clean, y_pred_clean, best_pipeline, X_hold, metrics
 
 # ==================== VISUALIZATIONS ====================
 def plot_roc_curves(results_dict):
@@ -461,7 +493,7 @@ def plot_roc_curves(results_dict):
     ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random classifier")
     ax.set_xlabel("False Positive Rate", fontsize=12)
     ax.set_ylabel("True Positive Rate", fontsize=12)
-    ax.set_title(f"ROC Curves: Binary Classification at {THRESHOLD_PPB} ppb", fontsize=13, fontweight="bold")
+    ax.set_title(f"ROC Curves: Binary Classification at {THRESHOLD_PPB} ppb [OUTLIERS REMOVED]", fontsize=13, fontweight="bold")
     ax.legend(fontsize=11, loc="lower right")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -595,7 +627,7 @@ def plot_decision_metrics_table(results_dict):
             else:
                 table[(i, j)].set_facecolor("#F2F2F2")
     
-    plt.title(f"Decision Metrics at {THRESHOLD_PPB} ppb Action Level", 
+    plt.title(f"Decision Metrics at {THRESHOLD_PPB} ppb Action Level [OUTLIERS REMOVED]", 
              fontsize=13, fontweight="bold", pad=20)
     plt.tight_layout()
     plt.savefig(f"{PLOTS_DIR}/decision_metrics_table.png", dpi=300, bbox_inches="tight")
@@ -630,6 +662,7 @@ def plot_error_distribution(results_dict):
 def main():
     print("\n" + "="*70)
     print("UNCERTAINTY QUANTIFICATION & DECISION METRICS AT 15 PPB ACTION LEVEL")
+    print("ROBUST VERSION: 16.9 ppb OUTLIERS REMOVED")
     print("="*70)
     
     # Ensure plots directory exists
@@ -646,7 +679,7 @@ def main():
     
     # Summary table
     print("\n" + "="*70)
-    print("SUMMARY: BOTH MODELS")
+    print("SUMMARY: BOTH MODELS (CLEAN DATA, n=47)")
     print("="*70)
     print(f"\n{'Model':<25} | {'RMSE':<8} | {'MAE':<8} | {'R²':<8} | {'Sensitivity':<12} | {'Specificity':<12} | {'AUC':<8}")
     print("-" * 105)

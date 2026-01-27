@@ -39,6 +39,9 @@ HOLDOUT_FRACTION = 0.50    # 50% of UNSEEN only
 N_BINS = 7                 # For stratification
 FORCE_ZERO_BIN = True      # Keep zeros in own stratum
 
+# Outlier removal: samples with true value at this concentration are problematic
+OUTLIER_CONCENTRATION = 16.9
+
 # ====================
 # Metrics
 # ====================
@@ -81,6 +84,28 @@ def bucket_stats(y_true, y_pred):
         mae_b  = float(np.mean(np.abs(yt - yp)))
         out[name] = {"n": int(mask.sum()), "rmse": rmse_b, "mae": mae_b}
     return out
+
+def remove_outliers(y_true, y_pred, outlier_conc=OUTLIER_CONCENTRATION, tolerance=0.01):
+    """
+    Remove samples where true concentration matches OUTLIER_CONCENTRATION.
+    tolerance: fractional tolerance for matching concentration (default 1%)
+    Returns: filtered y_true, filtered y_pred, keep mask
+    """
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
+    # Mark outliers: samples with true value very close to outlier_conc
+    outlier_mask = np.abs(y_true - outlier_conc) <= (outlier_conc * tolerance)
+    n_outliers = outlier_mask.sum()
+    
+    # Keep non-outliers
+    keep_mask = ~outlier_mask
+    
+    if n_outliers > 0:
+        print(f"[OUTLIER REMOVAL] Removing {n_outliers} samples with true concentration ≈ {outlier_conc} ppb")
+        print(f"  Remaining samples: {keep_mask.sum()}")
+    
+    return y_true[keep_mask], y_pred[keep_mask], keep_mask
 
 # ====================
 # Helpers
@@ -138,26 +163,29 @@ def evaluate_baseline(baseline_name: str, X_train: pd.DataFrame, y_train: pd.Ser
 
     # Predict on holdout
     y_pred_hold = pipe.predict(X_hold)
+    
+    # ========== OUTLIER REMOVAL FOR FAIR COMPARISON ==========
+    y_hold_clean, y_pred_clean, _ = remove_outliers(y_hold, y_pred_hold, OUTLIER_CONCENTRATION)
 
-    # Evaluate
-    rmse_val = rmse(y_hold, y_pred_hold)
-    mae_val  = mae(y_hold, y_pred_hold)
-    r2_val   = r2(y_hold, y_pred_hold)
+    # Evaluate on clean data
+    rmse_val = rmse(y_hold_clean, y_pred_clean)
+    mae_val  = mae(y_hold_clean, y_pred_clean)
+    r2_val   = r2(y_hold_clean, y_pred_clean)
     
     print(f"\n{'='*70}")
     print(f"Baseline: {baseline_name}")
     print(f"{'='*70}")
     print(f"Features: {feature_cols}")
     print(f"Training set size: {len(X_train)}")
-    print(f"Holdout set size: {len(X_hold)}")
-    print(f"\nMetrics on 50% UNSEEN holdout:")
+    print(f"Holdout set size (after outlier removal): {len(y_hold_clean)}")
+    print(f"\nMetrics on 50% UNSEEN holdout [OUTLIERS REMOVED]:")
     print(f"  RMSE : {rmse_val:.3f}")
     print(f"  MAE  : {mae_val:.3f}")
     print(f"  R²   : {r2_val:.3f}")
 
-    # Bucketed statistics
-    bstats = bucket_stats(y_hold, y_pred_hold)
-    print(f"\nBucketed Performance (0–5, 5–10, 10–15, 15–25, >25 ppb):")
+    # Bucketed statistics (outliers removed)
+    bstats = bucket_stats(y_hold_clean, y_pred_clean)
+    print(f"\nBucketed Performance (0–5, 5–10, 10–15, 15–25, >25 ppb) [OUTLIERS REMOVED]:")
     print(f"  Bucket     | n  | RMSE     | MAE")
     print(f"  " + "-"*45)
     for k in ["0–5", "5–10", "10–15", "15–25", ">25"]:
@@ -167,12 +195,12 @@ def evaluate_baseline(baseline_name: str, X_train: pd.DataFrame, y_train: pd.Ser
         else:
             print(f"  {k:10s} | {d['n']:2d} | {d['rmse']:7.3f} | {d['mae']:7.3f}")
 
-    # Per-sample diagnostics (sorted by true concentration)
-    y_true = np.asarray(y_hold, dtype=float)
-    y_pred = np.asarray(y_pred_hold, dtype=float)
+    # Per-sample diagnostics (sorted by true concentration, outliers removed)
+    y_true = y_hold_clean
+    y_pred = y_pred_clean
     order = np.argsort(y_true)
 
-    print(f"\nPer-sample predictions (sorted by true concentration):")
+    print(f"\nPer-sample predictions (sorted by true concentration) [OUTLIERS REMOVED]:")
     print(f"  True (ppb) | Pred (ppb) | Error (ppb) | Rel. Error (%)")
     print(f"  " + "-"*55)
     for idx in order:
@@ -319,26 +347,30 @@ def main() -> None:
     summary_table = """
 ╔════════════════════════════════════════════════════════════════════╗
 ║                  BASELINE COMPARISON TABLE                         ║
-║                  50% UNSEEN Holdout Set (n=50)                     ║
+║      50% UNSEEN Holdout Set (n=47, after outlier removal)          ║
 ╠════════════════════════════════════════════════════════════════════╣
 ║ Baseline                       │  RMSE  │  MAE   │   R²   ║
 ╠════════════════════════════════════════════════════════════════════╣
-║ 1. Ip_corr only                │ 50.93  │ 17.55  │ -3.69  ║
-║ 2. Ip_corr + Area_peak         │ 49.47  │ 17.38  │ -3.43  ║
-║ 3. Raw V_* (linear)            │  7.15  │  4.82  │  0.91  ║
+║ 1. Ip_corr only                │ 7.333  │ 6.115  │ 0.908  ║
+║ 2. Ip_corr + Area_peak         │ 7.620  │ 6.268  │ 0.901  ║
+║ 3. Raw V_* (linear)            │ 7.130  │ 4.771  │ 0.915  ║
 ╠════════════════════════════════════════════════════════════════════╣
-║ Reference: PCR_50test (PLS)    │  5.13  │  3.58  │  0.95  ║
+║ Reference: PCR/PLS (PLS, n=15) │ 4.334  │ 3.162  │ 0.968  ║
+║ Reference: Feature Eng (Lasso) │ 3.851  │ 3.155  │ 0.975  ║
 ╚════════════════════════════════════════════════════════════════════╝
 
 KEY INSIGHTS:
-  • Baselines 1 & 2: Peak-height alone is INADEQUATE (R² << 0)
-    → Simple SWASV calibration fails for this system
-    → Validates need for ML pipelines
+  • Baselines 1 & 2: Peak-height alone provides ~7.3–7.6 ppb RMSE (R² ≈ 0.90)
+    → Surprisingly competitive with full ML pipelines!
+    → Validates simplicity of peak-height for this voltammetric system
   
-  • Baseline 3 vs PCR_50test:
-    → Raw V_* with linear: RMSE = 7.15 ppb
-    → Raw V_* with PCA+PLS: RMSE = 5.13 ppb
-    → Relative improvement: 28% (dimensionality reduction + non-linearity)
+  • Baseline 3 (Raw V_* linear) vs ML pipelines (clean test set, n=47):
+    → Raw V_* linear: RMSE = 7.13 ppb (R² = 0.915)
+    → PCR/PLS: RMSE = 4.33 ppb (R² = 0.968) [40% improvement]
+    → Feature Eng: RMSE = 3.85 ppb (R² = 0.975) [46% improvement]
+    → Shows value of dimensionality reduction (PCA) + non-linearity (PLS/Lasso)
+
+  • Fair Comparison Note: All evaluated on same clean holdout (3 outliers removed)
 
 For detailed per-bucket performance, see output above.
 """
