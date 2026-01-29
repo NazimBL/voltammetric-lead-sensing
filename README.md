@@ -10,7 +10,7 @@ Lead contamination in drinking water is a critical environmental health concern.
 - **Two modeling pipelines** for robust lead level prediction
 - **Robust outlier handling** to improve model reliability
 - **Comprehensive feature engineering** from raw voltammetric signals
-- **Multiple regression approaches** (Linear, PCR, PLS, and their robust variants)
+- **Multiple regression approaches** (Linear, PCR, PLS)
 - **Automated data processing** from raw voltammetry to model-ready features
 
 ---
@@ -288,21 +288,5 @@ The voltammetric peak for lead oxidation/reduction occurs in a characteristic po
 - **PCR/PLS**: Dimensionality reduction regression methods for spectroscopic data
 - **Robust Regression**: Techniques for handling outliers in real-world measurements
 
----
 
-## Future Enhancements
 
-- [ ] Web API for real-time lead level prediction
-- [ ] Deep learning models (CNN/LSTM) for temporal voltammetry
-- [ ] Hardware integration with portable voltammetry devices
-- [ ] Bayesian uncertainty quantification for regulatory compliance
-
----
-
-## License
-
-[Add your license here]
-
-## Contact
-
-For questions or contributions, contact [maintainer email]
